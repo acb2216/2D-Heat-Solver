@@ -1,0 +1,192 @@
+import math
+import numpy as np
+import matplotlib.pyplot as plt
+
+thickness = 0.01 # meters
+width = 0.1 # meters
+height = 0.15 # meters
+Ttop = 373 # Kelvin
+Tbottom = 273 # Kelvin
+Tleft = Tbottom
+Tright = Tbottom
+nodey = 16
+nodex = 11
+celly = nodey - 1
+cellx = nodex - 1
+dx = width/cellx
+dy = height/celly
+cellArrayx = np.linspace(dx/2,width-dx/2,cellx)
+cellArrayy = np.linspace(dy/2,height-dy/2,celly)
+cellArrayxExact = np.linspace(0,width,100)
+cellArrayyExact = np.linspace(0,height,150)
+X,Y = np.meshgrid(cellArrayx,cellArrayy)
+XExact,YExact = np.meshgrid(cellArrayxExact,cellArrayyExact)
+
+def jacobi(A,RHS,cellNum,relaxFactor):
+    tol = 1e-6
+    error = 1
+    numSol = np.ones_like(RHS)
+    numSol_new = np.zeros_like(numSol)
+    iterationLimit = 1000
+    convergenceHistory = np.zeros((iterationLimit,1))
+    for iteration in range(0,iterationLimit):
+        numSol_new = np.zeros_like(numSol)
+        for i in range(0,cellNum):
+            G = 0
+            for j in range(0,cellNum):
+                if j != i:
+                    G = G + A[i,j]*numSol[j,0] 
+            numSol_new[i,0] = (1-relaxFactor)*numSol[i,0] + relaxFactor*(RHS[i,0] - G) / A[i, i]
+        error = np.linalg.norm(numSol_new-numSol)
+        convergenceHistory[iteration] = error
+        if error < tol:
+            break
+        numSol = numSol_new
+    return numSol, convergenceHistory
+    
+def centralDiff(cellx,celly,relaxFactor):
+    A = np.zeros((celly*cellx,cellx*celly))
+    RHS = np.zeros((cellx*celly,1))
+    cellNum = cellx*celly
+    for i in range(0,celly*cellx):
+        for j in range(0,cellx*celly):
+            if i == 0: # South Left Corner
+                if j == 0:
+                    A[i,j] = -6
+                elif j == 1:
+                    A[i,j] = 1
+                elif j == 10:
+                    A[i,j] = 1
+                else:
+                    A[i,j] = 0
+                RHS[i,0] = -1092
+            elif i == 9: # South Right Corner
+                if j == 9:
+                    A[i,j] = -6
+                elif j == 8:
+                    A[i,j] = 1
+                elif j == 19:
+                    A[i,j] = 1
+                else:
+                    A[i,j] = 0
+                RHS[i,0] = -1092
+            elif i == 140: # North Left Corner
+                if j == 140:
+                    A[i,j] = -6
+                elif j == 141:
+                    A[i,j] = 1
+                elif j == 130:
+                    A[i,j] = 1
+                else:
+                    A[i,j] = 0
+                RHS[i,0] = -1292
+            elif i == 149: # North Right Corner
+                if j == 149:
+                    A[i,j] = -6
+                elif j == 148:
+                    A[i,j] = 1
+                elif j == 139:
+                    A[i,j] = 1
+                else:
+                    A[i,j] = 0
+                RHS[i,0] = -1292
+            elif i in [10,20,30,40,50,60,70,80,90,100,110,120]: # Left Boundary
+                if j == i:
+                    A[i,j] = -5
+                elif j == (i+1):
+                    A[i,j] = 1
+                elif j == (i+10):
+                    A[i,j] = 1
+                elif j == (i-10):
+                    A[i,j] = 1
+                else:
+                    A[i,j] = 0
+                RHS[i,0] = -546
+            elif i in [19,29,39,49,59,69,79,89,99,109,119,129,139]: # Right Boundary
+                if j == i:
+                    A[i,j] = -5
+                elif j == (i-1):
+                    A[i,j] = 1
+                elif j == (i-10):
+                    A[i,j] = 1
+                elif j == (i+10):
+                    A[i,j] = 1
+                else:
+                    A[i,j] = 0
+                RHS[i,0] = -546
+            elif i in [1,2,3,4,5,6,7,8]: # South Boundary
+                if j == i:
+                    A[i,j] = -5
+                elif j == (i+1):
+                    A[i,j] = 1
+                elif j == (i-1):
+                    A[i,j] = 1
+                elif j == (i+10):
+                    A[i,j] = 1
+                else:
+                    A[i,j] = 0
+                RHS[i,0] = -546
+            elif i in [141,142,143,144,145,146,147,148]: # North Boundary
+                if j == i:
+                    A[i,j] = -5
+                elif j == (i+1):
+                    A[i,j] = 1
+                elif j == (i-1):
+                    A[i,j] = 1
+                elif j == (i-10):
+                    A[i,j] = 1
+                else:
+                    A[i,j] = 0
+                RHS[i,0] = -746
+            else: # Interior Cells
+                if j == i:
+                    A[i,j] = -4
+                elif j == (i+1):
+                    A[i,j] = 1
+                elif j == (i-1):
+                    A[i,j] = 1
+                elif j == (i+10):
+                    A[i,j] = 1
+                elif j == (i-10):
+                    A[i,j] = 1
+                RHS[i,0] = 0
+            
+                
+    #numSol = np.linalg.solve(A,RHS)   
+    numSol, convergenceHistory = jacobi(A,RHS,cellNum,relaxFactor)
+    
+    Tmatrix = np.zeros((celly,cellx))
+    
+    for i in range(0,cellx*celly):
+        if i in range(0,10):
+            Tmatrix[0,i] = numSol[i]
+        elif i in range(10,20):
+            Tmatrix[1,i-10] = numSol[i]
+        elif i in range(20,30):
+            Tmatrix[2,i-20] = numSol[i]
+        elif i in range(30,40):
+            Tmatrix[3,i-30] = numSol[i]
+        elif i in range(40,50):
+            Tmatrix[4,i-40] = numSol[i]
+        elif i in range(50,60):
+            Tmatrix[5,i-50] = numSol[i]
+        elif i in range(60,70):
+            Tmatrix[6,i-60] = numSol[i]
+        elif i in range(70,80):
+            Tmatrix[7,i-70] = numSol[i]
+        elif i in range(80,90):
+            Tmatrix[8,i-80] = numSol[i]
+        elif i in range(90,100):
+            Tmatrix[9,i-90] = numSol[i]
+        elif i in range(100,110):
+            Tmatrix[10,i-100] = numSol[i]
+        elif i in range(110,120):
+            Tmatrix[11,i-110] = numSol[i]
+        elif i in range(120,130):
+            Tmatrix[12,i-120] = numSol[i]
+        elif i in range(130,140):
+            Tmatrix[13,i-130] = numSol[i]
+        elif i in range(140,150):
+            Tmatrix[14,i-140] = numSol[i]
+    
+    return Tmatrix, convergenceHistory
